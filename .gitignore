@@ -1,0 +1,28 @@
+# Dependencies
+node_modules/
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Playwright reports and test results
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Authentication state - may contain cookies or tokens
+/playwright/.auth/
+
+# Coverage
+/coverage/
+/.nyc_output/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db

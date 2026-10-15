@@ -1,0 +1,30 @@
+{
+  "name": "medusa-automation",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "cross-env TEST_ENV=local playwright test",
+    "test:smoke": "cross-env TEST_ENV=local playwright test --grep @smoke",
+    "test:regression": "cross-env TEST_ENV=local playwright test --grep @regression",
+    "test:ui": "cross-env TEST_ENV=local playwright test --project=ui",
+    "test:api": "cross-env TEST_ENV=local playwright test --project=api",
+    "test:list": "cross-env TEST_ENV=ci playwright test --list",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "report": "playwright show-report"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.0",
+    "@types/node": "^26.6.5",
+    "cross-env": "^10.1.0",
+    "dotenv": "^18.0.8",
+    "eslint": "^10.12.0",
+    "typescript-eslint": "^8.71.2"
+  }
+}
