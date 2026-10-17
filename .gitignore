@@ -11,7 +11,6 @@ node_modules/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
-/test-data/
 
 # Authentication state - may contain cookies or tokens
 /playwright/.auth/
