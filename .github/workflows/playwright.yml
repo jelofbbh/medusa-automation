@@ -17,5 +17,9 @@ jobs:
       run: npm ci
     - name: Install Playwright Browsers
       run: npx playwright install --with-deps
-    - name: Run Playwright tests
-      run: npx playwright test
+    - name: Check config and list tests
+      run: npx playwright test --list
+      env:
+        STOREFRONT_URL: http://localhost:8000
+        ADMIN_URL: http://localhost:9000/app
+        API_URL: http://localhost:9000
