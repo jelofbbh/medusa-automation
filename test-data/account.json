@@ -4,8 +4,8 @@
     "lastName": "PW",
     "password": "Admin123"
   },
-  "existedAccount":{
-    "existedEmail": "ppthaobh1992@gmail.com",
+  "existingAccount":{
+    "existingEmail": "ppthaobh1992@gmail.com",
     "password": "0917252374"
   },
    "nonExistedAccount":{

@@ -1,45 +1,42 @@
-import {test, expect} from '@playwright/test'
-import { RegisterPage } from "../../../pages/RegisterPage";
-import { generatePhone, generateRandomEmail } from "../../../test-data/factories";
+import { test, expect } from '@playwright/test';
+import { RegisterPage } from '../../../pages/RegisterPage';
+import { generatePhone, generateRandomEmail } from '../../../test-data/factories';
 import users from '../../../test-data/account.json';
 
 test.describe('Test register function', () => {
-
     test.use({ storageState: { cookies: [], origins: [] } });
 
-    test('Verify creating new account with a valid user', async({page}) => {
-    
-        const registerPage = new RegisterPage(page);
+    const { firstName, lastName, password } = users.newRegisterAccount;
+    let registerPage: RegisterPage;
+
+    test.beforeEach(async ({ page }) => {
+        registerPage = new RegisterPage(page);
         await page.goto('dk/account');
         await registerPage.clickBtnJoinUs();
-        const dynamicEmail = generateRandomEmail();
-        const dynamicPhone = generatePhone();
+    });
+
+    // UI-ACCOUNT-01
+    test('Verify creating new account with a valid user', async () => {
+        const email = generateRandomEmail();
+
         await registerPage.registerInfo({
-            firstName: users.newRegisterAccount.firstName,
-            lastName: users.newRegisterAccount.lastName,
-            email: dynamicEmail,
-            password: users.newRegisterAccount.password,
-            phone: dynamicPhone})
+            firstName, lastName, email, password,
+            phone: generatePhone(),
+        });
         await registerPage.clickRegisterBtn();
 
-        await expect(page.getByTestId('welcome-message')).toBeVisible();
-        await expect(page.getByTestId('customer-email')).toContainText(dynamicEmail);
-        })
+        await expect(registerPage.welcomeMessage).toBeVisible();
+        await expect(registerPage.customerEmail).toContainText(email);
+    });
 
-    test('Verify creating new account with an existed user', async({page}) => {
-        const registerPage = new RegisterPage(page);
-        await page.goto('dk/account');
-        await registerPage.clickBtnJoinUs();
+    // UI-ACCOUNT-02
+    test('Verify creating new account with an existing user', async () => {
         await registerPage.registerInfo({
-            firstName: users.newRegisterAccount.firstName,
-            lastName: users.newRegisterAccount.lastName,
-            email: users.existedEmail.existedEmail,
-            password: users.newRegisterAccount.password,
-        })
+            firstName, lastName, password,
+            email: users.existingAccount.existingEmail,
+        });
         await registerPage.clickRegisterBtn();
 
-        await expect(page.getByTestId('register-error')).toBeVisible();
-        await expect(page.getByTestId('register-error')).toContainText('Error: Invalid email or password');
-    })
-    
-})
+        await expect(registerPage.registerError).toContainText('Error: Invalid email or password');
+    });
+});

@@ -18,7 +18,7 @@ const invalidLoginCases: InvalidLoginCase[] = [
     },
     {
         title: 'Verify signing in with wrong password',
-        email: users.existedAccount.existedEmail,
+        email: users.existingAccount.existingEmail,
         password: 'WrongPass!123',
         expectedError: 'Error: Invalid email or password',
     },
@@ -32,13 +32,13 @@ test.describe('Test login function', () => {
         const logginPage = new LoginPage(page);
         await page.goto('/dk/account');
         await logginPage.enterLogginInfo(
-            users.existedAccount.existedEmail,
-            users.existedAccount.password
+            users.existingAccount.existingEmail,
+            users.existingAccount.password
         );
         await logginPage.clickSignInBtn();
 
         await expect(page.getByTestId('welcome-message')).toBeVisible();
-        await expect(page.getByTestId('customer-email')).toContainText(users.existedAccount.existedEmail);
+        await expect(page.getByTestId('customer-email')).toContainText(users.existingAccount.existingEmail);
     });
 
     for (const testCase of invalidLoginCases) {
