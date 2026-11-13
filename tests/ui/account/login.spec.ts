@@ -37,8 +37,8 @@ test.describe('Test login function', () => {
         );
         await logginPage.clickSignInBtn();
 
-        await expect(page.getByTestId('welcome-message')).toBeVisible();
-        await expect(page.getByTestId('customer-email')).toContainText(users.existingAccount.existingEmail);
+        await expect(logginPage.welcomeMessage).toBeVisible();
+        await expect(logginPage.customerEmail).toContainText(users.existingAccount.existingEmail);
     });
 
     for (const testCase of invalidLoginCases) {
@@ -48,7 +48,7 @@ test.describe('Test login function', () => {
             await logginPage.enterLogginInfo(testCase.email, testCase.password);
             await logginPage.clickSignInBtn();
 
-            await expect(page.getByTestId('login-error-message')).toContainText(testCase.expectedError);
+            await expect(logginPage.loginErrorMessage).toContainText(testCase.expectedError);
         });
     }
 });
