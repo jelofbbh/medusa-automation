@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import { ProductsAPI } from '../../../fixtures/api/products.api';
 import { ProductDetailsPage } from '../../../pages/ProductDetailsPage';
+import { CartAPI } from '../../../fixtures/api/cart.api';
+import { CartPage } from '../../../pages/CartPage';
 
 test.describe('Product details', () => {
     test('UI-PDP-01 - Verify product information is displayed correctly', async ({ page, request }) => {
@@ -8,7 +10,6 @@ test.describe('Product details', () => {
         const product = await productsAPI.getProductById('prod_01M34Q4C6VF791TP49AC0G7PKS');
         const productDetailsPage = new ProductDetailsPage(page);
 
-        // This case needs a description and gallery images to verify real content.
         expect(product.description, 'Test product must have a description').toBeTruthy();
         expect(product.images.length, 'Test product must have gallery images').toBeGreaterThan(0);
 
@@ -150,7 +151,7 @@ test.describe('Product details', () => {
             { Color: 'Blue', Size: 'M' },
         ];
 
-        // Resolve known option combinations against API data; never hardcode prices.
+        // Resolve known option combinations against API data
         const variants = selections.map((selection) => {
             const variant = product.variants.find((item) => {
                 return item.options.length === product.options.length
@@ -207,5 +208,171 @@ test.describe('Product details', () => {
                 await expect(productDetailsPage.productPrice).toHaveText(expectedPriceText);
             });
         }
+    });
+    test.describe('Add to Cart with an isolated cart', () => {
+        // Start without shared authentication/cart cookies so quantity cannot accumulate.
+        test.use({ storageState: { cookies: [], origins: [] } });
+
+        test('UI-PDP-05 - Add to Cart is disabled when required variant options are not selected',
+            async ({ page, request, context }) => {
+                const product = await new ProductsAPI(request)
+                    .getProductById('prod_01M6RMERM974JDDS0B09VW2B0J');
+                const productDetailsPage = new ProductDetailsPage(page);
+                expect(product.options.map((option) => option.title).sort())
+                    .toEqual(['Color', 'Size']);
+                expect(product.variants.length, 'Product must require manual variant selection')
+                    .toBeGreaterThan(1);
+
+                const scenarios = [
+                    { name: 'No options selected', selection: null },
+                    { name: 'Only Color selected', selection: { title: 'Color', value: 'Black' } },
+                    { name: 'Only Size selected', selection: { title: 'Size', value: 'M' } },
+                ];
+
+                for (const scenario of scenarios) {
+                    await test.step(scenario.name, async () => {
+                        // A fresh document resets local option state without sharing a cart.
+                        await productDetailsPage.open(product.handle);
+                        for (const option of product.options) {
+                            await expect(productDetailsPage.optionGroup(option.title)).toBeVisible();
+                            await expect(productDetailsPage.selectedOption(option.title)).toHaveCount(0);
+                        }
+                        // Enabled option buttons distinguish the interactive UI from its disabled fallback.
+                        await expect(productDetailsPage.optionButton('Color', 'Black')).toBeEnabled();
+                        await expect(productDetailsPage.optionButton('Size', 'M')).toBeEnabled();
+
+                        if (scenario.selection) {
+                            const { title, value } = scenario.selection;
+                            await productDetailsPage.selectOption(title, value);
+                        }
+
+                        for (const option of product.options) {
+                            if (option.title === scenario.selection?.title) {
+                                await expect(productDetailsPage.selectedOption(option.title))
+                                    .toHaveText(scenario.selection.value);
+                            } else {
+                                await expect(productDetailsPage.selectedOption(option.title)).toHaveCount(0);
+                            }
+                        }
+
+                        await expect(productDetailsPage.addToCartButton).toBeVisible();
+                        await expect(productDetailsPage.addToCartButton).toBeDisabled();
+                        await expect(productDetailsPage.addToCartButton).toHaveText('Select variant');
+                        await expect(page).toHaveURL((url) => !url.searchParams.has('v_id'));
+                        const cookies = await context.cookies(page.url());
+                        expect(cookies.some((cookie) => cookie.name === '_medusa_cart_id'),
+                            'Incomplete options must not create a cart').toBe(false);
+                    });
+                }
+            });
+
+        test('UI-PDP-06 - Verify Add to Cart is disabled for out-of-stock variants',
+            async ({ page, request, context }) => {
+                const product = await new ProductsAPI(request)
+                    .getProductById('prod_01M6RMERM974JDDS0B09VW2B0J');
+                const productDetailsPage = new ProductDetailsPage(page);
+                expect(product.options.map((option) => option.title).sort())
+                    .toEqual(['Color', 'Size']);
+
+                for (const color of ['Brown', 'Blue']) {
+                    await test.step(`Out-of-stock ${color}/S`, async () => {
+                        const selection: Record<string, string> = { Color: color, Size: 'S' };
+                        const variant = product.variants.find((item) => {
+                            return item.options.length === product.options.length
+                                && product.options.every((option) => {
+                                    return item.options.some((value) => {
+                                        return value.option_id === option.id
+                                            && value.value === selection[option.title];
+                                    });
+                                });
+                        });
+                        expect(variant, `Missing test variant ${color}/S`).toBeDefined();
+                        // Zero inventory only prevents purchase when inventory is managed and backorders are off.
+                        expect(variant!.manage_inventory, `${color}/S must manage inventory`).toBe(true);
+                        expect(variant!.allow_backorder, `${color}/S must disallow backorders`).toBe(false);
+                        expect(typeof variant!.inventory_quantity, 'Inventory quantity must be returned by API')
+                            .toBe('number');
+                        expect(variant!.inventory_quantity!, `${color}/S must be out of stock`)
+                            .toBeLessThanOrEqual(0);
+
+                        await productDetailsPage.open(product.handle);
+                        await productDetailsPage.selectVariant(selection, variant!.id);
+                        await expect(productDetailsPage.selectedOption('Color')).toHaveText(color);
+                        await expect(productDetailsPage.selectedOption('Size')).toHaveText('S');
+                        await expect(page).toHaveURL((url) => url.searchParams.get('v_id') === variant!.id);
+                        await expect(productDetailsPage.addToCartButton).toBeVisible();
+                        await expect(productDetailsPage.addToCartButton).toHaveText('Out of stock');
+                        await expect(productDetailsPage.addToCartButton).toBeDisabled();
+
+                        const cookies = await context.cookies(page.url());
+                        expect(cookies.some((cookie) => cookie.name === '_medusa_cart_id'),
+                            'Selecting an out-of-stock variant must not create a cart').toBe(false);
+                    });
+                }
+            });
+
+        test('UI-PDP-04 - Add to Cart with a valid product variant', async ({ page, request, context }) => {
+            const product = await new ProductsAPI(request)
+                .getProductById('prod_01M34Q4C6V3RYC0VBCS0THXTZJ');
+            const sizeOption = product.options.find((option) => option.title === 'Size');
+            expect(sizeOption, 'Shorts must have a Size option').toBeDefined();
+            const variant = product.variants.find((item) => {
+                return item.options.length === 1 && item.options.some((value) => {
+                    return value.option_id === sizeOption!.id && value.value === 'M';
+                });
+            });
+            expect(variant, 'Shorts must have a size M variant').toBeDefined();
+            const isAvailable = !variant!.manage_inventory || variant!.allow_backorder
+                || (variant!.inventory_quantity ?? 0) > 0;
+            expect(isAvailable, 'Shorts/M must be available').toBe(true);
+            expect(variant!.calculated_price, 'Variant must have a calculated price').toBeTruthy();
+            const price = variant!.calculated_price!;
+            expect(Number.isFinite(price.calculated_amount)).toBe(true);
+            expect(price.calculated_amount).toBeGreaterThan(0);
+
+            const productDetailsPage = new ProductDetailsPage(page);
+            const cartPage = new CartPage(page);
+            await productDetailsPage.open(product.handle);
+            await productDetailsPage.selectVariant({ Size: 'M' }, variant!.id);
+            await expect(productDetailsPage.selectedOption('Size')).toHaveText('M');
+            await expect(productDetailsPage.addToCartButton).toBeEnabled();
+            await productDetailsPage.addToCart();
+            await cartPage.open();
+
+            // Confirm persistence and exact product/variant IDs through the cart created by UI.
+            const cookies = await context.cookies(page.url());
+            const cartCookie = cookies.find((cookie) => cookie.name === '_medusa_cart_id');
+            expect(cartCookie, 'Adding a product must create a cart cookie').toBeDefined();
+            const cart = await new CartAPI(context.request).getCartById(cartCookie!.value);
+            expect(cart.items, 'A single click must add exactly one item to the new cart').toHaveLength(1);
+            const item = cart.items[0];
+            expect(item.product_id).toBe(product.id);
+            expect(item.variant_id).toBe(variant!.id);
+            expect(item.quantity).toBe(1);
+            expect(cart.currency_code).toBe(price.currency_code);
+            expect(item.unit_price).toBeCloseTo(price.calculated_amount, 2);
+            expect(item.is_tax_inclusive).toBe(price.is_calculated_price_tax_inclusive);
+            expect(item.total).toBeCloseTo(item.subtotal + item.tax_total, 2);
+            const expectedBaseTotal = item.unit_price * item.quantity;
+            const expectedTotal = item.is_tax_inclusive
+                ? expectedBaseTotal : expectedBaseTotal + item.tax_total;
+            expect(item.total).toBeCloseTo(expectedTotal, 2);
+
+            await expect(cartPage.cartItems).toHaveCount(1);
+            await expect(cartPage.getItem(product.title, variant!.title)).toBeVisible();
+            await expect(cartPage.itemName(product.title, variant!.title)).toHaveText(product.title);
+            await expect(cartPage.itemVariant(product.title, variant!.title))
+                .toHaveText(`Variant: ${variant!.title}`);
+            await expect(cartPage.itemQuantity(product.title, variant!.title)).toHaveValue('1');
+
+            const formatter = new Intl.NumberFormat('en-US', {
+                style: 'currency', currency: cart.currency_code,
+            });
+            // Cart unit price includes tax: the storefront renders item.total / quantity.
+            await expect(cartPage.itemUnitPrice(product.title, variant!.title))
+                .toHaveText(formatter.format(item.total / item.quantity));
+            await expect(cartPage.itemTotalPrice(product.title, variant!.title))
+                .toHaveText(formatter.format(item.total));
+        });
     });
 });

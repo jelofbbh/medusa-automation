@@ -56,4 +56,20 @@ export class ProductDetailsPage {
 
         await this.page.waitForURL((url) => url.searchParams.get('v_id') === variantId);
     }
+
+    async addToCart() {
+        const productUrl = this.page.url();
+
+        // Adding to cart runs through a Next.js server action. Wait before navigating away.
+        await Promise.all([
+            this.page.waitForResponse((response) => {
+                return response.url() === productUrl
+                    && response.request().method() === 'POST'
+                    && !!response.request().headers()['next-action'];
+            }),
+            this.addToCartButton.click(),
+        ]);
+        await this.addToCartButton.and(this.page.locator('button:not([disabled])'))
+            .waitFor({ state: 'visible' });
+    }
 }
