@@ -31,10 +31,11 @@ export class CartPage {
     async open() {
         // Follow the storefront link to preserve the current country path.
         await this.cartLink.click();
-        await this.page.waitForURL((url) => url.pathname.endsWith('/cart'));
+        await this.page.waitForURL((url) => url.pathname.endsWith('/cart'), { waitUntil: 'domcontentloaded' });
         // The navigation link opens a hover dropdown; leave it before interacting with the cart.
         await this.page.mouse.move(0, 0);
         await this.cartDropdown.waitFor({ state: 'hidden' });
+        await this.page.getByTestId('cart-container').waitFor({ state: 'visible' });
     }
 
     getItem(productName: string, variantTitle: string): Locator {

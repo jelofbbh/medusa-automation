@@ -1,4 +1,5 @@
 import { APIRequestContext, expect } from '@playwright/test';
+import type { ShippingAddress } from '../../test-data/shipping-address';
 
 export interface StoreCartItem {
     id: string;
@@ -24,6 +25,14 @@ export interface StoreCart {
     tax_total: number;
     total: number;
     promotions: { id: string; code: string }[];
+    email: string;
+    customer_id: string | null;
+    shipping_address: Omit<ShippingAddress, 'email'> | null;
+    billing_address: Omit<ShippingAddress, 'email'> | null;
+    shipping_methods: { name: string; shipping_option_id: string; amount: number }[];
+    payment_collection: {
+        payment_sessions: { provider_id: string; status: string }[];
+    } | null;
 }
 
 interface StoreCartResponse {
@@ -50,7 +59,7 @@ export class CartAPI {
             `${this.apiUrl}/store/carts/${encodeURIComponent(cartId)}`,
             {
                 params: {
-                    fields: '*items,+items.total,+items.subtotal,+items.tax_total,*promotions',
+                    fields: '*items,+items.total,+items.subtotal,+items.tax_total,*promotions,*shipping_address,*billing_address,*shipping_methods,*payment_collection.payment_sessions',
                 },
                 headers: {
                     'x-publishable-api-key': this.publishableKey,

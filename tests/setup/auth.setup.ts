@@ -23,7 +23,8 @@ setup('authenticate admin', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Email' }).fill(ADMIN_EMAIL!);
   await page.getByPlaceholder('Password').fill(ADMIN_PASSWORD!);
   await page.getByRole('button', { name: "Continue with email" }).click();
-  await page.waitForURL((url) => !url.pathname.includes('orders'));
+  await page.waitForURL((url) => url.pathname.includes('/app/orders'), { waitUntil: 'domcontentloaded' });
+  await expect(page.getByRole('link', { name: 'Orders', exact: true }).first()).toBeVisible();
   await page.context().storageState({ path: AUTH.admin });
 });
 

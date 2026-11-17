@@ -1,4 +1,4 @@
-import { Locator, Page } from '@playwright/test';
+import { expect, Locator, Page } from '@playwright/test';
 
 export class ProductDetailsPage {
     readonly page: Page;
@@ -24,7 +24,7 @@ export class ProductDetailsPage {
     }
 
     async open(handle: string) {
-        await this.page.goto(`/products/${encodeURIComponent(handle)}`);
+        await this.page.goto(`/products/${encodeURIComponent(handle)}`, { waitUntil: 'domcontentloaded' });
         await this.productContainer.waitFor({ state: 'visible' });
     }
 
@@ -43,10 +43,12 @@ export class ProductDetailsPage {
     }
 
     async selectOption(title: string, value: string) {
-        await this.optionButton(title, value).click();
-        // Wait for the UI state before selecting the next option.
-        await this.optionButton(title, value).and(this.selectedOption(title))
-            .waitFor({ state: 'visible' });
+        // Selecting a value is idempotent. Retry if an early click precedes React hydration.
+        await expect(async () => {
+            await this.optionButton(title, value).click();
+            await expect(this.optionButton(title, value).and(this.selectedOption(title)))
+                .toBeVisible({ timeout: 1500 });
+        }).toPass({ timeout: 10_000 });
     }
 
     async selectVariant(options: Record<string, string>, variantId: string) {
@@ -54,7 +56,8 @@ export class ProductDetailsPage {
             await this.selectOption(title, value);
         }
 
-        await this.page.waitForURL((url) => url.searchParams.get('v_id') === variantId);
+        await this.page.waitForURL((url) => url.searchParams.get('v_id') === variantId,
+            { waitUntil: 'domcontentloaded' });
     }
 
     async addToCart() {
